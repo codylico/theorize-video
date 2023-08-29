@@ -3,9 +3,10 @@ project(theorize C CXX)
 
 find_library(theoraenc_lib NAMES theoraenc)
 find_library(theoradec_lib NAMES theoradec)
-find_path(theora_include NAMES "theoraenc.h")
+find_path(theora_include NAMES "theora/theoraenc.h")
 
 set(theorize_SOURCES
+	"src/main.cpp"
   )
 
 add_executable(theorize "${theorize_SOURCES}")
