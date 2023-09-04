@@ -12,8 +12,10 @@
 static
 void scale(theorize::ycbcr_box& dst, theorize::ycbcr_box const& src);
 
+class packager;
+
 static
-bool write_packet(std::ostream &o, ogg_packet const& packet);
+bool write_packet(std::ostream &o, packager& pack, ogg_packet& packet);
 
 class encoder
 {
@@ -26,6 +28,18 @@ public:
     ~encoder();
     operator th_enc_ctx*() const noexcept;
     explicit operator bool() const noexcept;
+};
+class packager
+{
+private:
+    ogg_stream_state ptr;
+public:
+    packager();
+    packager(packager const&) = delete;
+    packager& operator=(packager const&) = delete;
+    ~packager();
+    operator ogg_stream_state*() noexcept;
+    explicit operator bool() noexcept;
 };
 
 void scale(theorize::ycbcr_box& dst, theorize::ycbcr_box const& src) {
@@ -73,13 +87,38 @@ encoder::operator bool() const noexcept {
     return ptr;
 }
 
-bool write_packet(std::ostream &o, ogg_packet const& packet) {
+packager::packager() : ptr{} {
+    ogg_stream_init(&ptr, 0);
+}
+packager::~packager() {
+    ogg_stream_clear(&ptr);
+}
+packager::operator ogg_stream_state*() noexcept {
+    return &ptr;
+}
+packager::operator bool() noexcept {
+    return ogg_stream_check(&ptr);
+}
+
+bool write_packet(std::ostream &o, packager& pack, ogg_packet& packet) {
     if (!o) {
         std::cerr << "error: unable to attempt packet write\n";
     }
-    o.write(reinterpret_cast<char*>(packet.packet), packet.bytes);
-    if (!o) {
-        std::cerr << "error: failed to write packet\n";
+    int const res = ogg_stream_packetin(pack, &packet);
+    if (res != 0) {
+        std::cerr << "error: packet packaging failed\n";
+        return false;
+    }
+    while (pack) {
+        ogg_page page;
+        int const page_res = ogg_stream_pageout(pack, &page);
+        if (!page_res)
+            return static_cast<bool>(pack);
+        o.write(reinterpret_cast<char*>(page.header), page.header_len);
+        o.write(reinterpret_cast<char*>(page.body), page.body_len);
+        if (!o) {
+            std::cerr << "error: failed to write page\n";
+        }
     }
     return static_cast<bool>(o);
 }
@@ -161,6 +200,7 @@ int main(int argc, char**argv)
         if (!enc) {
             return EXIT_FAILURE;
         }
+        packager pack;
         th_comment comments = {};
         int last = 1;
         ogg_packet packet = {};
@@ -173,7 +213,7 @@ int main(int argc, char**argv)
                     " flush\n";
                 return EXIT_FAILURE;
             }
-            if (!write_packet(out, packet))
+            if (!write_packet(out, pack, packet))
                 return EXIT_FAILURE;
         }
         std::string file_path;
@@ -221,7 +261,7 @@ int main(int argc, char**argv)
                             "during frame generation\n";
                         return EXIT_FAILURE;
                     } else if (last) {
-                        if (!write_packet(out, packet))
+                        if (!write_packet(out, pack, packet))
                             return EXIT_FAILURE;
                     }
                 }
@@ -237,8 +277,20 @@ int main(int argc, char**argv)
                     "during ending generation\n";
                 return EXIT_FAILURE;
             } else if (last) {
-                if (!write_packet(out, packet))
+                if (!write_packet(out, pack, packet))
                     return EXIT_FAILURE;
+            }
+        }
+        last = 1;
+        while (last) {
+            ogg_page page;
+            last = ogg_stream_flush(pack, &page);
+            if (!last)
+                break;
+            out.write(reinterpret_cast<char*>(page.header), page.header_len);
+            out.write(reinterpret_cast<char*>(page.body), page.body_len);
+            if (!out) {
+                std::cerr << "error: failed to flush page\n";
             }
         }
     }
