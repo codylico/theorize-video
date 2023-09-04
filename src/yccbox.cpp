@@ -18,7 +18,7 @@ namespace theorize
     constexpr std::size_t yccbox_addr(std::size_t width,
             unsigned x, unsigned y)
     {
-        return (width * y + x) * 3;
+        return (width * y + x);
     }
     unsigned char* yccbox_alloc(unsigned width, unsigned height) {
         constexpr unsigned int max_size = 32767u;
@@ -51,10 +51,17 @@ namespace theorize
         h = other.h;
         return *this;
     }
+    ycbcr_box::~ycbcr_box() {
+        if (d)
+            delete[] d;
+        d = nullptr;
+    }
     //END   ycbcr_box / rule-of-six
 
     //BEGIN ycbcr_box / methods
     void ycbcr_box::resize(unsigned width, unsigned height) {
+        if (w == width && h == height)
+            return;
         unsigned char* const new_ptr = yccbox_alloc(width, height);
         if (d)
             delete[] d;
@@ -65,14 +72,37 @@ namespace theorize
     }
     ycbcr ycbcr_box::get(unsigned int x, unsigned int y) const noexcept {
         unsigned char const* const ptr = d+yccbox_addr(w,x,y);
-        return ycbcr{ptr[0],ptr[1],ptr[2]};
+        unsigned int const total = w * h;
+        return ycbcr{ptr[0],ptr[total],ptr[2*total]};
     }
     void ycbcr_box::set(unsigned int x, unsigned int y, ycbcr value) noexcept {
         unsigned char* const ptr = d+yccbox_addr(w,x,y);
+        unsigned int const total = w * h;
         ptr[0] = value.y;
-        ptr[1] = value.cb;
-        ptr[2] = value.cr;
+        ptr[total] = value.cb;
+        ptr[2*total] = value.cr;
         return;
+    }
+    void ycbcr_box::grey() noexcept {
+        std::memset(d, 128, yccbox_total(w,h));
+    }
+    unsigned char* ycbcr_box::y_plane() noexcept {
+        return d;
+    }
+    unsigned char const* ycbcr_box::y_plane() const noexcept {
+        return d;
+    }
+    unsigned char* ycbcr_box::cb_plane() noexcept {
+        return d + w*h;
+    }
+    unsigned char const* ycbcr_box::cb_plane() const noexcept {
+        return d + w*h;
+    }
+    unsigned char* ycbcr_box::cr_plane() noexcept {
+        return d + 2*w*h;
+    }
+    unsigned char const* ycbcr_box::cr_plane() const noexcept {
+        return d + 2*w*h;
     }
     //END   ycbcr_box / methods
 }
