@@ -22,7 +22,7 @@ class encoder
 private:
     th_enc_ctx* ptr;
 public:
-    encoder(int width, int height, int fps);
+    encoder(int width, int height, int fps, int quality);
     encoder(encoder const&) = delete;
     encoder& operator=(encoder const&) = delete;
     ~encoder();
@@ -52,7 +52,7 @@ void scale(theorize::ycbcr_box& dst, theorize::ycbcr_box const& src) {
     }
     return;
 }
-encoder::encoder(int width, int height, int fps) {
+encoder::encoder(int width, int height, int fps, int quality) {
     th_info info = {};
     th_info_init(&info);
     info.frame_width = width;
@@ -64,7 +64,8 @@ encoder::encoder(int width, int height, int fps) {
     info.colorspace = TH_CS_ITU_REC_470M;
     info.pixel_fmt = TH_PF_444;
     //info.target_bitrate = 0;
-    //info.quality = 0;
+    if (quality >= 0)
+        info.quality = quality;
     info.fps_numerator = fps;
     info.fps_denominator = 1;
     info.aspect_numerator = 1;
@@ -130,6 +131,7 @@ int main(int argc, char**argv)
     int width = 640;
     int height = 480;
     int fps = 30;
+    int quality = -1;
     int result = EXIT_SUCCESS;
     std::unique_ptr<std::ifstream> input_ptr;
     if (argc > 1) {
@@ -174,6 +176,8 @@ int main(int argc, char**argv)
                 height = std::stoi(value);
             else if (key == "fps")
                 fps = std::stoi(value);
+            else if (key == "quality")
+                quality = std::stoi(value);
         }
     }
     if (fps <= 0) {
@@ -196,7 +200,7 @@ int main(int argc, char**argv)
                 << output_path << std::endl;
             return EXIT_FAILURE;
         }
-        encoder enc(width, height, fps);
+        encoder enc(width, height, fps, quality);
         if (!enc) {
             return EXIT_FAILURE;
         }
