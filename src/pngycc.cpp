@@ -93,10 +93,10 @@ namespace theorize {
           unsigned int red, unsigned int green, unsigned int blue,
           unsigned int alpha)
     {
-        constexpr pngycc_gamma gamma = {1.0,1.0,0.1,0.001};
-        constexpr pngycc_kappa kappa = {0.25,0.25};
+        constexpr pngycc_gamma gamma = {4.5,0.45,0.018,0.099};
+        constexpr pngycc_kappa kappa = {0.299,0.114};
         constexpr pngycc_defrac defrac = {
-            {0.0,255.0}, {128.0,255.0}, {128.0,255.0}
+            {16.0,219.0}, {128.0,224.0}, {128.0,224.0}
         };
         ycbcr_box& box = *static_cast<ycbcr_box*>(img);
         pngycc_prime const prime = {
